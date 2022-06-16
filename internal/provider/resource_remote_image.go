@@ -108,19 +108,13 @@ func (r remoteImageResource) Read(ctx context.Context, req tfsdk.ReadResourceReq
 		return
 	}
 
-	ref, err := name.ParseReference(data.Target.Value)
+	authenticator, err := r.getTargetCraneAuth(data.Target)
 	if err != nil {
-		resp.Diagnostics.AddError("Invalid Target", fmt.Sprintf("target is an invalid docker reference: %s", err))
+		resp.Diagnostics.AddError("Invalid Target", err.Error())
 		return
 	}
-	opts := make([]crane.Option, 0)
-	address := ref.Context().RegistryStr()
-	registryAuth := r.provider.FindRegistryAuth(address)
-	if registryAuth != nil {
-		opts = append(opts, crane.WithAuth(registryAuth))
-	}
 
-	meta, err := crane.Head(data.Target.Value, opts...)
+	meta, err := crane.Head(data.Target.Value, authenticator)
 	if err != nil {
 		resp.Diagnostics.AddError("Docker Registry Error", fmt.Sprintf("Unable to retrieve image metadata: %s", err))
 		return
@@ -174,17 +168,31 @@ func (r remoteImageResource) Delete(ctx context.Context, req tfsdk.DeleteResourc
 		return
 	}
 
-	// If applicable, this is a great opportunity to initialize any necessary
-	// provider client data and make a call using it.
-	// example, err := d.provider.client.DeleteExample(...)
-	// if err != nil {
-	//     resp.Diagnostics.AddError("Client Error", fmt.Sprintf("Unable to delete example, got error: %s", err))
-	//     return
-	// }
+	authenticator, err := r.getTargetCraneAuth(data.Target)
+	if err != nil {
+		resp.Diagnostics.AddError("Invalid Target", err.Error())
+		return
+	}
 
-	// TODO: Implement
+	if err := crane.Delete(data.Target.Value, authenticator); err != nil {
+		resp.Diagnostics.AddError("Docker Registry Error", fmt.Sprintf("Unable to delete remote image: %s", err))
+		return
+	}
 }
 
 func (r remoteImageResource) ImportState(ctx context.Context, req tfsdk.ImportResourceStateRequest, resp *tfsdk.ImportResourceStateResponse) {
 	tfsdk.ResourceImportStatePassthroughID(ctx, tftypes.NewAttributePath().WithAttributeName("id"), req, resp)
+}
+
+func (r remoteImageResource) getTargetCraneAuth(target types.String) (crane.Option, error) {
+	ref, err := name.ParseReference(target.Value)
+	if err != nil {
+		return func(*crane.Options) {}, fmt.Errorf("target is an invalid docker reference: %s", err)
+	}
+	address := ref.Context().RegistryStr()
+	registryAuth := r.provider.FindRegistryAuth(address)
+	if registryAuth != nil {
+		return crane.WithAuth(registryAuth), nil
+	}
+	return func(*crane.Options) {}, nil
 }
