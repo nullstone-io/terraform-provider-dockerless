@@ -61,7 +61,6 @@ func (t remoteImageResourceType) NewResource(ctx context.Context, in tfsdk.Provi
 }
 
 type exampleResourceData struct {
-	Id     types.String `tfsdk:"id"`
 	Source types.String `tfsdk:"source"`
 	Target types.String `tfsdk:"target"`
 	Digest types.String `tfsdk:"digest"`
@@ -115,7 +114,6 @@ func (r remoteImageResource) Read(ctx context.Context, req tfsdk.ReadResourceReq
 		return
 	}
 	data.Digest = types.String{Value: meta.Digest.String()}
-	data.Id = types.String{Value: meta.Digest.String()}
 
 	// If applicable, this is a great opportunity to initialize any necessary
 	// provider client data and make a call using it.
@@ -174,7 +172,7 @@ func (r remoteImageResource) Delete(ctx context.Context, req tfsdk.DeleteResourc
 }
 
 func (r remoteImageResource) ImportState(ctx context.Context, req tfsdk.ImportResourceStateRequest, resp *tfsdk.ImportResourceStateResponse) {
-	tfsdk.ResourceImportStatePassthroughID(ctx, tftypes.NewAttributePath().WithAttributeName("id"), req, resp)
+	tfsdk.ResourceImportStatePassthroughID(ctx, tftypes.NewAttributePath().WithAttributeName("digest"), req, resp)
 }
 
 func (r remoteImageResource) getCraneReference(dockerName types.String) (name.Reference, []crane.Option, []remote.Option, error) {

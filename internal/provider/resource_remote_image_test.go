@@ -2,40 +2,40 @@ package provider
 
 import (
 	"fmt"
+	"os"
 	"testing"
 
 	"github.com/hashicorp/terraform-plugin-sdk/v2/helper/resource"
 )
 
-func TestAccExampleResource(t *testing.T) {
+func TestAccRemoteImageResource(t *testing.T) {
+	// NOTE: This test requires ACC_DOCKER_USERNAME, ACC_DOCKER_PASSWORD env vars set with access to push to nullstone/tf-provider-test
+
 	resource.Test(t, resource.TestCase{
 		PreCheck:                 func() { testAccPreCheck(t) },
 		ProtoV6ProviderFactories: testAccProtoV6ProviderFactories,
 		Steps: []resource.TestStep{
 			// Create and Read testing
 			{
-				Config: testAccExampleResourceConfig("one"),
+				Config: testAccRemoteImageResourceConfig("nullstone/tf-provider-test:v1", "nullstone/tf-provider-test:v2"),
 				Check: resource.ComposeAggregateTestCheckFunc(
-					resource.TestCheckResourceAttr("scaffolding_example.test", "configurable_attribute", "one"),
-					resource.TestCheckResourceAttr("scaffolding_example.test", "id", "example-id"),
+					resource.TestCheckResourceAttr("dockerless_remote_image.test", "source", "nullstone/tf-provider-test:v1"),
+					resource.TestCheckResourceAttr("dockerless_remote_image.test", "target", "nullstone/tf-provider-test:v2"),
+					resource.TestCheckResourceAttrSet("dockerless_remote_image.test", "digest"),
 				),
 			},
 			// ImportState testing
 			{
-				ResourceName:      "scaffolding_example.test",
+				ResourceName:      "dockerless_remote_image.test",
 				ImportState:       true,
 				ImportStateVerify: true,
-				// This is not normally necessary, but is here because this
-				// example code does not have an actual upstream service.
-				// Once the Read method is able to refresh information from
-				// the upstream service, this can be removed.
-				ImportStateVerifyIgnore: []string{"configurable_attribute"},
+				ImportStateVerifyIgnore: []string{"source"},
 			},
 			// Update and Read testing
 			{
-				Config: testAccExampleResourceConfig("two"),
+				Config: testAccRemoteImageResourceConfig("nullstone/tf-provider-test:v1", "nullstone/tf-provider-test:v2"),
 				Check: resource.ComposeAggregateTestCheckFunc(
-					resource.TestCheckResourceAttr("scaffolding_example.test", "configurable_attribute", "two"),
+					resource.TestCheckResourceAttrSet("dockerless_remote_image.test", "digest"),
 				),
 			},
 			// Delete testing automatically occurs in TestCase
@@ -43,10 +43,24 @@ func TestAccExampleResource(t *testing.T) {
 	})
 }
 
-func testAccExampleResourceConfig(configurableAttribute string) string {
+func testAccRemoteImageResourceConfig(source, target string) string {
+	username := os.Getenv("ACC_DOCKER_USERNAME")
+	password := os.Getenv("ACC_DOCKER_PASSWORD")
+	fmt.Println(username, password)
+
 	return fmt.Sprintf(`
-resource "scaffolding_example" "test" {
-  configurable_attribute = %[1]q
+provider "dockerless" {
+	registry_auth = {
+      "index.docker.io" = {
+        username = %[3]q
+        password = %[4]q
+      } 
+	}
 }
-`, configurableAttribute)
+
+resource "dockerless_remote_image" "test" {
+  source = %[1]q
+  target = %[2]q
+}
+`, source, target, username, password)
 }

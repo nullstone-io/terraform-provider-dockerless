@@ -22,7 +22,7 @@ type provider struct {
 	// TODO: If appropriate, implement upstream provider SDK or HTTP client.
 	// client vendorsdk.ExampleClient
 
-	registryAuths []registryAuth
+	registryAuths map[string]registryAuth
 
 	// configured is set to true at the end of the Configure method.
 	// This can be used in Resource and DataSource implementations to verify
@@ -37,12 +37,12 @@ type provider struct {
 
 // providerData can be used to store data from the Terraform configuration.
 type providerData struct {
-	RegistryAuths types.List `tfsdk:"registry_auth"`
+	RegistryAuths types.Map `tfsdk:"registry_auth"`
 }
 
 func (p *provider) FindRegistryAuth(address string) *registryAuth {
-	for _, registryAuth := range p.registryAuths {
-		if registryAuth.Address == address {
+	for key, registryAuth := range p.registryAuths {
+		if key == address {
 			return &registryAuth
 		}
 	}
@@ -88,13 +88,7 @@ func (p *provider) GetSchema(ctx context.Context) (tfsdk.Schema, diag.Diagnostic
 		Attributes: map[string]tfsdk.Attribute{
 			"registry_auth": {
 				Optional: true,
-				Attributes: tfsdk.ListNestedAttributes(map[string]tfsdk.Attribute{
-					"address": {
-						Type:        types.StringType,
-						Required:    true,
-						Description: "Address of the registry",
-					},
-
+				Attributes: tfsdk.MapNestedAttributes(map[string]tfsdk.Attribute{
 					"username": {
 						Type:        types.StringType,
 						Optional:    true,

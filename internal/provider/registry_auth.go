@@ -5,7 +5,6 @@ import "github.com/google/go-containerregistry/pkg/authn"
 var _ authn.Authenticator = registryAuth{}
 
 type registryAuth struct {
-	Address  string `tfsdk:"address"`
 	Username string `tfsdk:"username"`
 	Password string `tfsdk:"password"`
 }

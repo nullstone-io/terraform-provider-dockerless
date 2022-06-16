@@ -20,10 +20,11 @@ data "aws_ecr_authorization_token" "temporary" {
 }
 
 provider "dockerless" {
-  registry_auth {
-    address  = data.aws_ecr_authorization_token.temporary.proxy_endpoint
-    username = data.aws_ecr_authorization_token.temporary.user_name
-    password = data.aws_ecr_authorization_token.temporary.password
+  registry_auth = {
+    data.aws_ecr_authorization_token.temporary.proxy_endpoint = {
+      username = data.aws_ecr_authorization_token.temporary.user_name
+      password = data.aws_ecr_authorization_token.temporary.password
+    }
   }
 }
 ```
@@ -33,13 +34,12 @@ provider "dockerless" {
 
 ### Optional
 
-- `registry_auth` (Attributes List) (see [below for nested schema](#nestedatt--registry_auth))
+- `registry_auth` (Attributes Map) (see [below for nested schema](#nestedatt--registry_auth))
 
 <a id="nestedatt--registry_auth"></a>
 ### Nested Schema for `registry_auth`
 
 Optional:
 
-- `address` (String) Address of the registry
 - `password` (String, Sensitive) Password for the registry
 - `username` (String) Username for the registry

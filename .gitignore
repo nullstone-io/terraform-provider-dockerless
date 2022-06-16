@@ -35,3 +35,6 @@ website/vendor
 *.winfile eol=crlf
 
 vendor/
+
+*.env
+internal/provider/*.tgz
