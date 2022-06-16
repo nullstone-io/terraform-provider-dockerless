@@ -22,6 +22,8 @@ type provider struct {
 	// TODO: If appropriate, implement upstream provider SDK or HTTP client.
 	// client vendorsdk.ExampleClient
 
+	registryAuths []registryAuth
+
 	// configured is set to true at the end of the Configure method.
 	// This can be used in Resource and DataSource implementations to verify
 	// that the provider was previously configured.
@@ -35,7 +37,16 @@ type provider struct {
 
 // providerData can be used to store data from the Terraform configuration.
 type providerData struct {
-	Example types.String `tfsdk:"example"`
+	RegistryAuths types.List `tfsdk:"registry_auth"`
+}
+
+func (p *provider) FindRegistryAuth(address string) *registryAuth {
+	for _, registryAuth := range p.registryAuths {
+		if registryAuth.Address == address {
+			return &registryAuth
+		}
+	}
+	return nil
 }
 
 func (p *provider) Configure(ctx context.Context, req tfsdk.ConfigureProviderRequest, resp *tfsdk.ConfigureProviderResponse) {
@@ -49,6 +60,12 @@ func (p *provider) Configure(ctx context.Context, req tfsdk.ConfigureProviderReq
 
 	// Configuration values are now available.
 	// if data.Example.Null { /* ... */ }
+	 diags = data.RegistryAuths.ElementsAs(ctx,&p.registryAuths, true)
+	 resp.Diagnostics.Append(diags...)
+	 if resp.Diagnostics.HasError() {
+		 return
+	 }
+
 
 	// If the upstream provider SDK or HTTP client requires configuration, such
 	// as authentication or logging, this is a great opportunity to do so.
@@ -71,7 +88,7 @@ func (p *provider) GetSchema(ctx context.Context) (tfsdk.Schema, diag.Diagnostic
 		Attributes: map[string]tfsdk.Attribute{
 			"registry_auth": {
 				Optional: true,
-				Attributes: tfsdk.SingleNestedAttributes(map[string]tfsdk.Attribute{
+				Attributes: tfsdk.ListNestedAttributes(map[string]tfsdk.Attribute{
 					"address": {
 						Type:        types.StringType,
 						Required:    true,
@@ -79,16 +96,16 @@ func (p *provider) GetSchema(ctx context.Context) (tfsdk.Schema, diag.Diagnostic
 					},
 
 					"username": {
-						Type:          types.StringType,
-						Optional:      true,
-						Description:   "Username for the registry",
+						Type:        types.StringType,
+						Optional:    true,
+						Description: "Username for the registry",
 					},
 
 					"password": {
-						Type:          types.StringType,
-						Optional:      true,
-						Sensitive:     true,
-						Description:   "Password for the registry",
+						Type:        types.StringType,
+						Optional:    true,
+						Sensitive:   true,
+						Description: "Password for the registry",
 					},
 				}),
 			},

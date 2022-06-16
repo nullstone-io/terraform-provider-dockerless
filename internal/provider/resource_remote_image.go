@@ -2,7 +2,10 @@ package provider
 
 import (
 	"context"
+	"fmt"
+	"github.com/google/go-containerregistry/pkg/name"
 
+	"github.com/google/go-containerregistry/pkg/crane"
 	"github.com/hashicorp/terraform-plugin-framework/diag"
 	"github.com/hashicorp/terraform-plugin-framework/tfsdk"
 	"github.com/hashicorp/terraform-plugin-framework/types"
@@ -34,6 +37,11 @@ Currently, this docker image must be public or accessible using the same auth as
 				Required:            true,
 				Type:                types.StringType,
 			},
+			"digest": {
+				MarkdownDescription: "The digest of the target docker image.",
+				Computed:            true,
+				Type:                types.StringType,
+			},
 		},
 	}, nil
 }
@@ -47,8 +55,10 @@ func (t remoteImageResourceType) NewResource(ctx context.Context, in tfsdk.Provi
 }
 
 type exampleResourceData struct {
+	Id     types.String `tfsdk:"id"`
 	Source types.String `tfsdk:"source"`
 	Target types.String `tfsdk:"target"`
+	Digest types.String `tfsdk:"digest"`
 }
 
 type remoteImageResource struct {
@@ -98,6 +108,26 @@ func (r remoteImageResource) Read(ctx context.Context, req tfsdk.ReadResourceReq
 		return
 	}
 
+	ref, err := name.ParseReference(data.Target.Value)
+	if err != nil {
+		resp.Diagnostics.AddError("Invalid Target", fmt.Sprintf("target is an invalid docker reference: %s", err))
+		return
+	}
+	opts := make([]crane.Option, 0)
+	address := ref.Context().RegistryStr()
+	registryAuth := r.provider.FindRegistryAuth(address)
+	if registryAuth != nil {
+		opts = append(opts, crane.WithAuth(registryAuth))
+	}
+
+	meta, err := crane.Head(data.Target.Value, opts...)
+	if err != nil {
+		resp.Diagnostics.AddError("Docker Registry Error", fmt.Sprintf("Unable to retrieve image metadata: %s", err))
+		return
+	}
+	data.Digest = types.String{Value: meta.Digest.String()}
+	data.Id = types.String{Value: meta.Digest.String()}
+
 	// If applicable, this is a great opportunity to initialize any necessary
 	// provider client data and make a call using it.
 	// example, err := d.provider.client.ReadExample(...)
@@ -105,8 +135,6 @@ func (r remoteImageResource) Read(ctx context.Context, req tfsdk.ReadResourceReq
 	//     resp.Diagnostics.AddError("Client Error", fmt.Sprintf("Unable to read example, got error: %s", err))
 	//     return
 	// }
-
-	// TODO: Implement
 
 	diags = resp.State.Set(ctx, &data)
 	resp.Diagnostics.Append(diags...)
