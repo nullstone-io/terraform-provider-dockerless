@@ -3,15 +3,21 @@ package provider
 import (
 	"context"
 	"fmt"
-	"github.com/google/go-containerregistry/pkg/name"
-
 	"github.com/google/go-containerregistry/pkg/crane"
+	"github.com/google/go-containerregistry/pkg/name"
+	v1 "github.com/google/go-containerregistry/pkg/v1"
+	"github.com/google/go-containerregistry/pkg/v1/remote"
 	"github.com/hashicorp/terraform-plugin-framework/diag"
 	"github.com/hashicorp/terraform-plugin-framework/tfsdk"
 	"github.com/hashicorp/terraform-plugin-framework/types"
 	"github.com/hashicorp/terraform-plugin-go/tftypes"
 	"github.com/hashicorp/terraform-plugin-log/tflog"
+	"io/ioutil"
+	"os"
 )
+
+// Logging Reference:
+// see https://pkg.go.dev/github.com/hashicorp/terraform-plugin-log/tflog
 
 // Ensure provider defined types fully satisfy framework interfaces
 var _ tfsdk.ResourceType = remoteImageResourceType{}
@@ -75,24 +81,13 @@ func (r remoteImageResource) Create(ctx context.Context, req tfsdk.CreateResourc
 		return
 	}
 
-	// If applicable, this is a great opportunity to initialize any necessary
-	// provider client data and make a call using it.
-	// example, err := d.provider.client.CreateExample(...)
-	// if err != nil {
-	//     resp.Diagnostics.AddError("Client Error", fmt.Sprintf("Unable to create example, got error: %s", err))
-	//     return
-	// }
-
-	// For the purposes of this example code, hardcoding a response value to
-	// save into the Terraform state.
-	//data.Id = types.String{Value: "example-id"}
-
-	// TODO: Implement
-
-	// write logs using the tflog package
-	// see https://pkg.go.dev/github.com/hashicorp/terraform-plugin-log/tflog
-	// for more information
-	tflog.Trace(ctx, "created a resource")
+	if digest, err := r.forwardImage(data.Source, data.Target); err != nil {
+		resp.Diagnostics.AddError("Docker Registry Error", err.Error())
+		return
+	} else {
+		data.Digest = types.String{Value: digest.String()}
+		tflog.Trace(ctx, fmt.Sprintf("Pushed Image: digest => %s", data.Digest.Value))
+	}
 
 	diags = resp.State.Set(ctx, &data)
 	resp.Diagnostics.Append(diags...)
@@ -108,13 +103,13 @@ func (r remoteImageResource) Read(ctx context.Context, req tfsdk.ReadResourceReq
 		return
 	}
 
-	authenticator, err := r.getTargetCraneAuth(data.Target)
+	_, opts, _, err := r.getCraneReference(data.Target)
 	if err != nil {
 		resp.Diagnostics.AddError("Invalid Target", err.Error())
 		return
 	}
 
-	meta, err := crane.Head(data.Target.Value, authenticator)
+	meta, err := crane.Head(data.Target.Value, opts...)
 	if err != nil {
 		resp.Diagnostics.AddError("Docker Registry Error", fmt.Sprintf("Unable to retrieve image metadata: %s", err))
 		return
@@ -144,15 +139,13 @@ func (r remoteImageResource) Update(ctx context.Context, req tfsdk.UpdateResourc
 		return
 	}
 
-	// If applicable, this is a great opportunity to initialize any necessary
-	// provider client data and make a call using it.
-	// example, err := d.provider.client.UpdateExample(...)
-	// if err != nil {
-	//     resp.Diagnostics.AddError("Client Error", fmt.Sprintf("Unable to update example, got error: %s", err))
-	//     return
-	// }
-
-	// TODO: Implement
+	if digest, err := r.forwardImage(data.Source, data.Target); err != nil {
+		resp.Diagnostics.AddError("Docker Registry Error", err.Error())
+		return
+	} else {
+		data.Digest = types.String{Value: digest.String()}
+		tflog.Trace(ctx, fmt.Sprintf("Pushed Image: digest => %s", data.Digest.Value))
+	}
 
 	diags = resp.State.Set(ctx, &data)
 	resp.Diagnostics.Append(diags...)
@@ -168,13 +161,13 @@ func (r remoteImageResource) Delete(ctx context.Context, req tfsdk.DeleteResourc
 		return
 	}
 
-	authenticator, err := r.getTargetCraneAuth(data.Target)
+	_, opts, _, err := r.getCraneReference(data.Target)
 	if err != nil {
 		resp.Diagnostics.AddError("Invalid Target", err.Error())
 		return
 	}
 
-	if err := crane.Delete(data.Target.Value, authenticator); err != nil {
+	if err := crane.Delete(data.Target.Value, opts...); err != nil {
 		resp.Diagnostics.AddError("Docker Registry Error", fmt.Sprintf("Unable to delete remote image: %s", err))
 		return
 	}
@@ -184,15 +177,71 @@ func (r remoteImageResource) ImportState(ctx context.Context, req tfsdk.ImportRe
 	tfsdk.ResourceImportStatePassthroughID(ctx, tftypes.NewAttributePath().WithAttributeName("id"), req, resp)
 }
 
-func (r remoteImageResource) getTargetCraneAuth(target types.String) (crane.Option, error) {
-	ref, err := name.ParseReference(target.Value)
+func (r remoteImageResource) getCraneReference(dockerName types.String) (name.Reference, []crane.Option, []remote.Option, error) {
+	craneOptions := []crane.Option{}
+	remoteOptions := []remote.Option{}
+
+	ref, err := name.ParseReference(dockerName.Value)
 	if err != nil {
-		return func(*crane.Options) {}, fmt.Errorf("target is an invalid docker reference: %s", err)
+		return ref, craneOptions, remoteOptions, fmt.Errorf("%q is an invalid docker reference: %s", dockerName.Value, err)
 	}
 	address := ref.Context().RegistryStr()
 	registryAuth := r.provider.FindRegistryAuth(address)
 	if registryAuth != nil {
-		return crane.WithAuth(registryAuth), nil
+		craneOptions = append(craneOptions, crane.WithAuth(registryAuth))
+		remoteOptions = append(remoteOptions, remote.WithAuth(registryAuth))
 	}
-	return func(*crane.Options) {}, nil
+	return ref, craneOptions, remoteOptions, nil
+}
+
+func (r remoteImageResource) forwardImage(src, target types.String) (v1.Hash, error) {
+	srcRef, srcCraneOpts, srcRemoteOpts, err := r.getCraneReference(src)
+	if err != nil {
+		return v1.Hash{}, fmt.Errorf("source %q is an invalid docker reference: %s", src.Value, err)
+	}
+	targetRef, _, targetRemoteOpts, err := r.getCraneReference(target)
+	if err != nil {
+		return v1.Hash{}, fmt.Errorf("target %q is an invalid docker reference: %s", target.Value, err)
+	}
+
+	// Retrieve metadata about source image and build image map for pulling image
+	rmt, err := remote.Get(srcRef, srcRemoteOpts...)
+	if err != nil {
+		return v1.Hash{}, fmt.Errorf("error retrieving metadata for source image: %s", err)
+	}
+	img, err := rmt.Image()
+	if err != nil {
+		return v1.Hash{}, fmt.Errorf("error preparing source image for pull: %s", err)
+	}
+	imgDigest, err := img.Digest()
+	if err != nil {
+		return v1.Hash{}, fmt.Errorf("source image is invalid: %s", err)
+	}
+	imageMap := map[string]v1.Image{src.Value: img}
+
+	// Pull docker image using crane and save it as a tarball to 'path'
+
+	file, err := ioutil.TempFile(".", "tmp_remote_image_*.tgz")
+	if err != nil {
+		return v1.Hash{}, fmt.Errorf("error creating temporary file for source image: %s", err)
+	}
+	file.Close() // close immediately to allow pull to work
+
+	path := file.Name()
+	if err := crane.MultiSave(imageMap, path, srcCraneOpts...); err != nil {
+		return imgDigest, fmt.Errorf("error pulling source image: %s", err)
+	}
+
+	// Load image from tarball and push it
+	if _, err := os.Stat(path); err != nil {
+		return imgDigest, fmt.Errorf("error finding source tarball: %s", err)
+	}
+	pushImg, err := crane.Load(path)
+	if err != nil {
+		return imgDigest, fmt.Errorf("loading %s as tarball: %w", path, err)
+	}
+	if err := remote.Write(targetRef, pushImg, targetRemoteOpts...); err != nil {
+		return imgDigest, fmt.Errorf("error pushing image: %w", err)
+	}
+	return imgDigest, nil
 }

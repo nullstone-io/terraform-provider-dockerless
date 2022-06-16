@@ -21,4 +21,8 @@ This resource pushes an image to a target docker image repository from a remote 
 Currently, this docker image must be public or accessible using the same auth as the "target" image repository.
 - `target` (String) The docker image name and tag to ensure exists in an image repository.
 
+### Read-Only
+
+- `digest` (String) The digest of the target docker image.
+
 

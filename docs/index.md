@@ -33,7 +33,7 @@ provider "dockerless" {
 
 ### Optional
 
-- `registry_auth` (Attributes) (see [below for nested schema](#nestedatt--registry_auth))
+- `registry_auth` (Attributes List) (see [below for nested schema](#nestedatt--registry_auth))
 
 <a id="nestedatt--registry_auth"></a>
 ### Nested Schema for `registry_auth`
