@@ -83,8 +83,8 @@ func (r remoteImageResource) Create(ctx context.Context, req tfsdk.CreateResourc
 		resp.Diagnostics.AddError("Client Error", err.Error())
 		return
 	} else {
-		data.Digest = types.String{Value: digest.String()}
-		data.Id = types.String{Value: digest.String()}
+		data.Digest = types.String{Value: digest}
+		data.Id = types.String{Value: digest}
 		tflog.Trace(ctx, fmt.Sprintf("Pushed Image: digest => %s", data.Digest.Value))
 	}
 
@@ -128,8 +128,8 @@ func (r remoteImageResource) Update(ctx context.Context, req tfsdk.UpdateResourc
 		resp.Diagnostics.AddError("Client Error", err.Error())
 		return
 	} else {
-		data.Digest = types.String{Value: digest.String()}
-		data.Id = types.String{Value: digest.String()}
+		data.Digest = types.String{Value: digest}
+		data.Id = types.String{Value: digest}
 		tflog.Trace(ctx, fmt.Sprintf("Pushed Image: digest => %s", data.Digest.Value))
 	}
 

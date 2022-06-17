@@ -25,12 +25,12 @@ func TestAccRemoteImageResource(t *testing.T) {
 				),
 			},
 			// ImportState testing
-			//{
-			//	ResourceName:      "dockerless_remote_image.test",
-			//	ImportState:       true,
-			//	ImportStateVerify: true,
-			//	ImportStateVerifyIgnore: []string{"source"},
-			//},
+			/*{
+				ResourceName:            "dockerless_remote_image.test",
+				ImportState:             true,
+				ImportStateVerify:       true,
+				ImportStateVerifyIgnore: []string{"source"},
+			},*/
 			// Update and Read testing
 			{
 				Config: testAccRemoteImageResourceConfig("nullstone/tf-provider-test:v1", "nullstone/tf-provider-test:v2"),
