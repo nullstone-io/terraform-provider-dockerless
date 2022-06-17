@@ -6,7 +6,7 @@ import (
 	"log"
 
 	"github.com/hashicorp/terraform-plugin-framework/providerserver"
-	"github.com/hashicorp/terraform-provider-dockerless/internal/provider"
+	"github.com/nullstone-io/terraform-provider-dockerless/internal/provider"
 )
 
 // Run "go generate" to format example terraform files and generate the docs for the registry/website

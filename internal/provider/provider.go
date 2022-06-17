@@ -6,7 +6,7 @@ import (
 	"github.com/hashicorp/terraform-plugin-framework/diag"
 	"github.com/hashicorp/terraform-plugin-framework/tfsdk"
 	"github.com/hashicorp/terraform-plugin-framework/types"
-	"github.com/hashicorp/terraform-provider-dockerless/dockerless"
+	"github.com/nullstone-io/terraform-provider-dockerless/dockerless"
 )
 
 // Ensure provider defined types fully satisfy framework interfaces

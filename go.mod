@@ -1,4 +1,4 @@
-module github.com/hashicorp/terraform-provider-dockerless
+module github.com/nullstone-io/terraform-provider-dockerless
 
 go 1.18
 
