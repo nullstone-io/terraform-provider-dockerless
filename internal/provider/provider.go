@@ -3,10 +3,10 @@ package provider
 import (
 	"context"
 	"fmt"
-
 	"github.com/hashicorp/terraform-plugin-framework/diag"
 	"github.com/hashicorp/terraform-plugin-framework/tfsdk"
 	"github.com/hashicorp/terraform-plugin-framework/types"
+	"github.com/hashicorp/terraform-provider-dockerless/dockerless"
 )
 
 // Ensure provider defined types fully satisfy framework interfaces
@@ -19,10 +19,7 @@ type provider struct {
 	// communicate with the upstream service. Resource and DataSource
 	// implementations can then make calls using this client.
 	//
-	// TODO: If appropriate, implement upstream provider SDK or HTTP client.
-	// client vendorsdk.ExampleClient
-
-	registryAuths map[string]registryAuth
+	client *dockerless.Client
 
 	// configured is set to true at the end of the Configure method.
 	// This can be used in Resource and DataSource implementations to verify
@@ -40,15 +37,6 @@ type providerData struct {
 	RegistryAuths types.Map `tfsdk:"registry_auth"`
 }
 
-func (p *provider) FindRegistryAuth(address string) *registryAuth {
-	for key, registryAuth := range p.registryAuths {
-		if key == address {
-			return &registryAuth
-		}
-	}
-	return nil
-}
-
 func (p *provider) Configure(ctx context.Context, req tfsdk.ConfigureProviderRequest, resp *tfsdk.ConfigureProviderResponse) {
 	var data providerData
 	diags := req.Config.Get(ctx, &data)
@@ -60,15 +48,16 @@ func (p *provider) Configure(ctx context.Context, req tfsdk.ConfigureProviderReq
 
 	// Configuration values are now available.
 	// if data.Example.Null { /* ... */ }
-	 diags = data.RegistryAuths.ElementsAs(ctx,&p.registryAuths, true)
-	 resp.Diagnostics.Append(diags...)
-	 if resp.Diagnostics.HasError() {
-		 return
-	 }
+	registries := map[string]dockerless.RegistryAuth{}
+	diags = data.RegistryAuths.ElementsAs(ctx, &registries, true)
+	resp.Diagnostics.Append(diags...)
+	if resp.Diagnostics.HasError() {
+		return
+	}
 
-
-	// If the upstream provider SDK or HTTP client requires configuration, such
-	// as authentication or logging, this is a great opportunity to do so.
+	p.client = &dockerless.Client{
+		Registries: registries,
+	}
 
 	p.configured = true
 }

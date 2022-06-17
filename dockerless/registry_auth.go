@@ -1,15 +1,15 @@
-package provider
+package dockerless
 
 import "github.com/google/go-containerregistry/pkg/authn"
 
-var _ authn.Authenticator = registryAuth{}
+var _ authn.Authenticator = RegistryAuth{}
 
-type registryAuth struct {
+type RegistryAuth struct {
 	Username string `tfsdk:"username"`
 	Password string `tfsdk:"password"`
 }
 
-func (r registryAuth) Authorization() (*authn.AuthConfig, error) {
+func (r RegistryAuth) Authorization() (*authn.AuthConfig, error) {
 	return &authn.AuthConfig{
 		Username: r.Username,
 		Password: r.Password,
