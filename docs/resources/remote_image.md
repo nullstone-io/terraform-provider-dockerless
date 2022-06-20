@@ -18,6 +18,7 @@ resource "aws_ecr_repository" "this" {
 }
 
 data "aws_caller_identity" "this" {}
+data "aws_region" "current" {}
 
 data "aws_ecr_authorization_token" "temporary" {
   registry_id = data.aws_caller_identity.this.account_id
@@ -25,7 +26,7 @@ data "aws_ecr_authorization_token" "temporary" {
 
 provider "dockerless" {
   registry_auth = {
-    data.aws_ecr_authorization_token.temporary.proxy_endpoint = {
+    "${data.aws_caller_identity.this.account_id}.dkr.ecr.${data.aws_region.current.name}.amazonaws.com" = {
       username = data.aws_ecr_authorization_token.temporary.user_name
       password = data.aws_ecr_authorization_token.temporary.password
     }
@@ -50,5 +51,6 @@ Currently, this docker image must be public or accessible using the same auth as
 ### Read-Only
 
 - `digest` (String) The digest of the target docker image.
+- `id` (String) The ID of this resource.
 
 
