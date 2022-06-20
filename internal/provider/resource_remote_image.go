@@ -147,8 +147,10 @@ func (r remoteImageResource) Delete(ctx context.Context, req tfsdk.DeleteResourc
 		return
 	}
 
-	if err := r.provider.client.DeleteImageTag(data.Target.Value); err != nil {
-		resp.Diagnostics.AddError("Client Error", err.Error())
+	err := r.provider.client.DeleteImageTag(data.Target.Value)
+	if err != nil {
+		// TODO: Deleting images in AWS doesn't work, returns 404
+		//resp.Diagnostics.AddError("Client Error", err.Error())
 		return
 	}
 	tflog.Trace(ctx, fmt.Sprintf("Deleted Image: %s", data.Target.Value))
