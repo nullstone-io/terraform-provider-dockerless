@@ -52,5 +52,3 @@ Currently, this docker image must be public or accessible using the same auth as
 
 - `digest` (String) The digest of the target docker image.
 - `id` (String) The ID of this resource.
-
-
