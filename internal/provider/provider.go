@@ -2,133 +2,103 @@ package provider
 
 import (
 	"context"
-	"fmt"
-	"github.com/hashicorp/terraform-plugin-framework/diag"
-	"github.com/hashicorp/terraform-plugin-framework/tfsdk"
+	"github.com/hashicorp/terraform-plugin-framework/datasource"
+	"github.com/hashicorp/terraform-plugin-framework/provider"
+	"github.com/hashicorp/terraform-plugin-framework/provider/schema"
+	"github.com/hashicorp/terraform-plugin-framework/resource"
 	"github.com/hashicorp/terraform-plugin-framework/types"
 	"github.com/nullstone-io/terraform-provider-dockerless/dockerless"
 )
 
-// Ensure provider defined types fully satisfy framework interfaces
-var _ tfsdk.Provider = &provider{}
+// Ensure provider-defined types fully satisfy framework interfaces
+var (
+	_ provider.Provider = &dockerlessProvider{}
+)
+
+func New(version string) func() provider.Provider {
+	return func() provider.Provider {
+		return &dockerlessProvider{
+			version: version,
+		}
+	}
+}
 
 // provider satisfies the tfsdk.Provider interface and usually is included
 // with all Resource and DataSource implementations.
-type provider struct {
-	// client can contain the upstream provider SDK or HTTP client used to
-	// communicate with the upstream service. Resource and DataSource
-	// implementations can then make calls using this client.
-	//
-	client *dockerless.Client
-
-	// configured is set to true at the end of the Configure method.
-	// This can be used in Resource and DataSource implementations to verify
-	// that the provider was previously configured.
-	configured bool
-
+type dockerlessProvider struct {
 	// version is set to the provider version on release, "dev" when the
 	// provider is built and ran locally, and "test" when running acceptance
 	// testing.
 	version string
 }
 
-// providerData can be used to store data from the Terraform configuration.
-type providerData struct {
-	RegistryAuths types.Map `tfsdk:"registry_auth"`
+func (d *dockerlessProvider) Metadata(ctx context.Context, request provider.MetadataRequest, response *provider.MetadataResponse) {
+	response.TypeName = "dockerless"
+	response.Version = d.version
 }
 
-func (p *provider) Configure(ctx context.Context, req tfsdk.ConfigureProviderRequest, resp *tfsdk.ConfigureProviderResponse) {
-	var data providerData
-	diags := req.Config.Get(ctx, &data)
-	resp.Diagnostics.Append(diags...)
+func (d *dockerlessProvider) Schema(ctx context.Context, request provider.SchemaRequest, response *provider.SchemaResponse) {
+	response.Schema = schema.Schema{
+		Attributes: map[string]schema.Attribute{
+			"registry_auth": schema.MapNestedAttribute{
+				Optional:            true,
+				MarkdownDescription: "A map of docker registries and their authentication credentials. Keys are registry endpoints (e.g., ECR proxy endpoint).",
+				NestedObject: schema.NestedAttributeObject{
+					Attributes: map[string]schema.Attribute{
+						"username": schema.StringAttribute{
+							Optional:    true,
+							Description: "Username for the registry",
+						},
+						"password": schema.StringAttribute{
+							Optional:    true,
+							Sensitive:   true,
+							Description: "Password for the registry",
+						},
+					},
+				},
+			},
+		},
+		Blocks:              nil,
+		Description:         "",
+		MarkdownDescription: "",
+		DeprecationMessage:  "",
+	}
+}
 
-	if resp.Diagnostics.HasError() {
+func (d *dockerlessProvider) Configure(ctx context.Context, request provider.ConfigureRequest, response *provider.ConfigureResponse) {
+	var config dockerlessProviderModel
+	diags := request.Config.Get(ctx, &config)
+	response.Diagnostics.Append(diags...)
+	if response.Diagnostics.HasError() {
 		return
 	}
 
 	// Configuration values are now available.
 	// if data.Example.Null { /* ... */ }
 	registries := map[string]dockerless.RegistryAuth{}
-	diags = data.RegistryAuths.ElementsAs(ctx, &registries, true)
-	resp.Diagnostics.Append(diags...)
-	if resp.Diagnostics.HasError() {
+	diags = config.RegistryAuths.ElementsAs(ctx, &registries, true)
+	response.Diagnostics.Append(diags...)
+	if response.Diagnostics.HasError() {
 		return
 	}
 
-	p.client = &dockerless.Client{
+	client := &dockerless.Client{
 		Registries: registries,
 	}
-
-	p.configured = true
+	response.DataSourceData = client
+	response.ResourceData = client
 }
 
-func (p *provider) GetResources(ctx context.Context) (map[string]tfsdk.ResourceType, diag.Diagnostics) {
-	return map[string]tfsdk.ResourceType{
-		"dockerless_remote_image": remoteImageResourceType{},
-	}, nil
+func (d *dockerlessProvider) DataSources(ctx context.Context) []func() datasource.DataSource {
+	return []func() datasource.DataSource{}
 }
 
-func (p *provider) GetDataSources(ctx context.Context) (map[string]tfsdk.DataSourceType, diag.Diagnostics) {
-	return map[string]tfsdk.DataSourceType{}, nil
-}
-
-func (p *provider) GetSchema(ctx context.Context) (tfsdk.Schema, diag.Diagnostics) {
-	return tfsdk.Schema{
-		Attributes: map[string]tfsdk.Attribute{
-			"registry_auth": {
-				Optional: true,
-				Attributes: tfsdk.MapNestedAttributes(map[string]tfsdk.Attribute{
-					"username": {
-						Type:        types.StringType,
-						Optional:    true,
-						Description: "Username for the registry",
-					},
-
-					"password": {
-						Type:        types.StringType,
-						Optional:    true,
-						Sensitive:   true,
-						Description: "Password for the registry",
-					},
-				}),
-			},
-		},
-	}, nil
-}
-
-func New(version string) func() tfsdk.Provider {
-	return func() tfsdk.Provider {
-		return &provider{
-			version: version,
-		}
+func (d *dockerlessProvider) Resources(ctx context.Context) []func() resource.Resource {
+	return []func() resource.Resource{
+		NewRemoteImageResource,
 	}
 }
 
-// convertProviderType is a helper function for NewResource and NewDataSource
-// implementations to associate the concrete provider type. Alternatively,
-// this helper can be skipped and the provider type can be directly type
-// asserted (e.g. provider: in.(*provider)), however using this can prevent
-// potential panics.
-func convertProviderType(in tfsdk.Provider) (provider, diag.Diagnostics) {
-	var diags diag.Diagnostics
-
-	p, ok := in.(*provider)
-
-	if !ok {
-		diags.AddError(
-			"Unexpected Provider Instance Type",
-			fmt.Sprintf("While creating the data source or resource, an unexpected provider type (%T) was received. This is always a bug in the provider code and should be reported to the provider developers.", p),
-		)
-		return provider{}, diags
-	}
-
-	if p == nil {
-		diags.AddError(
-			"Unexpected Provider Instance Type",
-			"While creating the data source or resource, an unexpected empty provider instance was received. This is always a bug in the provider code and should be reported to the provider developers.",
-		)
-		return provider{}, diags
-	}
-
-	return *p, diags
+type dockerlessProviderModel struct {
+	RegistryAuths types.Map `tfsdk:"registry_auth"`
 }
