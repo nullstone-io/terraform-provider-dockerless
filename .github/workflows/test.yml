@@ -15,6 +15,10 @@ on:
 permissions:
   contents: read
 
+env:
+  ACC_DOCKER_USERNAME: ${{ secrets.ACC_DOCKER_USERNAME }}
+  ACC_DOCKER_PASSWORD: ${{ secrets.ACC_DOCKER_PASSWORD }}
+
 jobs:
   # Ensure project builds before running testing matrix
   build:
