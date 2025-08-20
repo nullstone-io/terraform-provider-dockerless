@@ -10,7 +10,7 @@ import (
 	"github.com/nullstone-io/terraform-provider-dockerless/dockerless"
 )
 
-// Ensure provider-defined types fully satisfy framework interfaces
+// Ensure provider-defined types fully satisfy framework interfaces.
 var (
 	_ provider.Provider = &dockerlessProvider{}
 )

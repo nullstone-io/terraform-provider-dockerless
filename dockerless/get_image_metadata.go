@@ -14,7 +14,7 @@ func (c Client) GetImageMetadata(dockerName string) (*v1.Descriptor, error) {
 
 	meta, err := crane.Head(dockerName, opts...)
 	if err != nil {
-		return nil, fmt.Errorf("Unable to retrieve image metadata: %w", err)
+		return nil, fmt.Errorf("unable to retrieve image metadata: %w", err)
 	}
 	return meta, nil
 }

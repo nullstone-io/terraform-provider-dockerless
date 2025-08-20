@@ -12,7 +12,7 @@ func (c Client) DeleteImageTag(dockerName string) error {
 	}
 
 	if err := crane.Delete(dockerName, opts...); err != nil {
-		return fmt.Errorf("Unable to delete remote image: %w", err)
+		return fmt.Errorf("unable to delete remote image: %w", err)
 	}
 	return nil
 }

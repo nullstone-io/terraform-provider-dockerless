@@ -14,7 +14,7 @@ import (
 // Logging Reference:
 // see https://pkg.go.dev/github.com/hashicorp/terraform-plugin-log/tflog
 
-// Ensure provider-defined types fully satisfy framework interfaces
+// Ensure provider-defined types fully satisfy framework interfaces.
 var (
 	_ resource.Resource                = &remoteImageResource{}
 	_ resource.ResourceWithConfigure   = &remoteImageResource{}
