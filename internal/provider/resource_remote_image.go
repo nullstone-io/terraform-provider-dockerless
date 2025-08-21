@@ -2,13 +2,16 @@ package provider
 
 import (
 	"context"
+	"errors"
 	"fmt"
+	"github.com/google/go-containerregistry/pkg/v1/remote/transport"
 	tfpath "github.com/hashicorp/terraform-plugin-framework/path"
 	"github.com/hashicorp/terraform-plugin-framework/resource"
 	"github.com/hashicorp/terraform-plugin-framework/resource/schema"
 	"github.com/hashicorp/terraform-plugin-framework/types"
 	"github.com/hashicorp/terraform-plugin-log/tflog"
 	"github.com/nullstone-io/terraform-provider-dockerless/dockerless"
+	"net/http"
 )
 
 // Logging Reference:
@@ -113,6 +116,11 @@ func (r *remoteImageResource) Read(ctx context.Context, req resource.ReadRequest
 
 	meta, err := r.client.GetImageMetadata(state.Target.ValueString())
 	if err != nil {
+		var te *transport.Error
+		if errors.As(err, &te) && te.StatusCode == http.StatusNotFound {
+			resp.State.RemoveResource(ctx)
+			return
+		}
 		resp.Diagnostics.AddError("Client Error", err.Error())
 		return
 	}
