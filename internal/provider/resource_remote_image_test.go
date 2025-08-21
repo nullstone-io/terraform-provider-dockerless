@@ -12,8 +12,8 @@ func TestAccRemoteImageResource(t *testing.T) {
 	// NOTE: This test requires ACC_DOCKER_USERNAME, ACC_DOCKER_PASSWORD env vars set with access to push to nullstone/tf-provider-test
 
 	resource.Test(t, resource.TestCase{
-		PreCheck:                 func() { testAccPreCheck(t) },
 		ProtoV6ProviderFactories: testAccProtoV6ProviderFactories,
+		PreCheck:                 func() { testAccPreCheck(t) },
 		Steps: []resource.TestStep{
 			// Create and Read testing
 			{

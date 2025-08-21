@@ -17,29 +17,24 @@ jobs:
   goreleaser:
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v3
+      - uses: actions/checkout@v5
         with:
           # Allow goreleaser to access older tag information.
           fetch-depth: 0
-      - uses: actions/setup-go@v3
+      - uses: actions/setup-go@v5
         with:
           go-version-file: 'go.mod'
           cache: true
-      # This uses an action (hashicorp/ghaction-import-gpg) that assumes you set your 
-      # private key in the `GPG_PRIVATE_KEY` secret and passphrase in the `PASSPHRASE`
-      # secret. If you would rather own your own GPG handling, please fork this action
-      # or use an alternative one for key handling.
       - name: Import GPG key
+        uses: crazy-max/ghaction-import-gpg@v6
         id: import_gpg
-        uses: crazy-max/ghaction-import-gpg@v5
         with:
-          # These secrets will need to be configured for the repository:
           gpg_private_key: ${{ secrets.GPG_PRIVATE_KEY }}
           passphrase: ${{ secrets.PASSPHRASE }}
       - name: Run GoReleaser
-        uses: goreleaser/goreleaser-action@v3
+        uses: goreleaser/goreleaser-action@v6
         with:
-          args: release --rm-dist
+          args: release --clean
         env:
           # GitHub sets the GITHUB_TOKEN secret automatically.
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
