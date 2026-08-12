@@ -68,7 +68,6 @@ jobs:
         # list whatever Terraform versions here you would like to support
         terraform:
           - '1.5.*'
-          - '1.8.*'
           - '1.11.*'
           - '1.13.*'
           - 'latest'
