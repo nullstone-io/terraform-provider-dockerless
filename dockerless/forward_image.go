@@ -38,6 +38,7 @@ func (c Client) ForwardImage(src, target string) (string, error) {
 	file.Close() // close immediately to allow pull to work
 
 	path := file.Name()
+	defer os.Remove(path)
 	if err := crane.MultiSave(imageMap, path, srcCraneOpts...); err != nil {
 		return "", fmt.Errorf("error pulling source image: %s", err)
 	}
